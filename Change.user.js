@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         chzzk Ad Block Auto Quality Change
-// @version      1.0.4
+// @version      1.0.5
 // @match        https://chzzk.naver.com/*
 // @description  치지직 광고 차단 감지 스크립트를 우회합니다.
 // @run-at       document-start
