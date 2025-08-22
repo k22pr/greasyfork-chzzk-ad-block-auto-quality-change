@@ -81,7 +81,7 @@
   function restartQualityInterval() {
     stopQualityInterval();
     startQualityInterval();
-    setTimeout(stopQualityInterval, 3000);
+    setTimeout(stopQualityInterval, 5000);
   }
 
   // SPA URL change
