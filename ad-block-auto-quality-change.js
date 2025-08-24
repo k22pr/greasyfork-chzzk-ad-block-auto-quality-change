@@ -15,12 +15,13 @@
   const QUALITY_SEL = "li.pzp-ui-setting-quality-item";
 
   let qualityInterval = null;
+  let processed = false;
 
-  function pressEnterOnFirstQuality() {
-    const item = document.querySelector(QUALITY_SEL);
-    if (!item) return;
-    item.focus?.({ preventScroll: true });
-    item.dispatchEvent(
+  function pressEnterOnElement(el) {
+    if (!el) return;
+    el.focus?.({ preventScroll: true });
+    el.click();
+    el.dispatchEvent(
       new KeyboardEvent("keydown", {
         bubbles: true,
         cancelable: true,
@@ -42,25 +43,57 @@
     const hasLive = location.pathname.includes("/live/");
     const videoEl = document.querySelector(VIDEO_SEL);
     const qualityItems = document.querySelectorAll(QUALITY_SEL);
-    const isHighQuality =
-      qualityItems[0]?.classList.contains(
-        "pzp-ui-setting-pane-item--checked"
-      ) ?? false;
+    console.log(qualityItems);
+    let highItem = Array.from(qualityItems).find((option) =>
+      option.textContent.includes("1080p")
+    );
 
-    // console.log("hq:", !!isHighQuality, "paused:", videoEl?.paused ?? null);
+    console.log("highItem", highItem, highItem?.textContent);
 
-    if (!hasLive) return stopQualityInterval();
+    if (!highItem)
+      highItem = Array.from(qualityItems).find((option) =>
+        option.textContent.includes("720p")
+      );
 
-    if (hasLive && !isHighQuality) {
-      pressEnterOnFirstQuality();
+    console.log("highItem", highItem);
+    const isNowHighQuality =
+      highItem?.classList.contains("pzp-ui-setting-pane-item--checked") ??
+      false;
+
+    // console.log("hq:", !!isNowHighQuality, "paused:", videoEl?.paused ?? null);
+
+    console.log("highItem", highItem, "isNowHighQuality", isNowHighQuality);
+    console.log(
+      "1080p",
+      highItem?.textContent?.includes("1080p"),
+      "720p",
+      highItem?.textContent?.includes("720p"),
+      "checked",
+      highItem?.classList.contains("pzp-ui-setting-pane-item--checked")
+    );
+
+    if (!hasLive) {
+      console.log("stop interval (!hasLive)", !hasLive);
+      return stopQualityInterval();
+    }
+
+    if (hasLive && !isNowHighQuality && !processed) {
+      pressEnterOnElement(highItem);
+      processed = true;
       return;
     }
 
-    if (isHighQuality && videoEl && videoEl.paused) {
+    if (isNowHighQuality && videoEl && videoEl.paused) {
       videoEl.play().catch(() => {});
     }
 
-    if (isHighQuality && videoEl && !videoEl.paused) {
+    if (isNowHighQuality && videoEl && !videoEl.paused) {
+      console.log(
+        "stop interval (isNowHighQuality && videoEl && !videoEl.paused)",
+        isNowHighQuality,
+        videoEl,
+        !videoEl.paused
+      );
       stopQualityInterval();
     }
   }
@@ -77,6 +110,7 @@
   }
 
   function restartQualityInterval() {
+    processed = false;
     stopQualityInterval();
     startQualityInterval();
     setTimeout(stopQualityInterval, 5000);
@@ -102,7 +136,7 @@
 
   // test: Alt+H
   window.addEventListener("keydown", (e) => {
-    if (e.altKey && e.key.toLowerCase() === "h") pressEnterOnFirstQuality();
+    if (e.altKey && e.key.toLowerCase() === "h") pressEnterOnElement();
   });
 
   restartQualityInterval();
@@ -120,7 +154,7 @@
   const removePopup = (el) => {
     const container =
       el.closest(
-        '[role="dialog"],[role="alertdialog"], [class*="popup"], [class*="modal"], [class*="layer"]'
+        '[role="dialog"], [role="alertdialog"], [class*="popup"], [class*="modal"], [class*="layer"]'
       ) || el;
 
     const nodes = container.parentElement.querySelectorAll(
