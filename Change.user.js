@@ -1,6 +1,6 @@
 // ==UserScript==
-// @name         chzzk Ad Block Auto Quality Change
-// @version      1.0.5
+// @name         CHZZK  Ad Block Auto Quality Change
+// @version      1.0.6
 // @match        https://chzzk.naver.com/*
 // @description  치지직 광고 차단 감지 스크립트를 우회합니다.
 // @run-at       document-start
@@ -11,8 +11,6 @@
 // ==/UserScript==
 
 (function () {
-  const SLIDER_SEL = "div.pzp-pc-progress-slider";
-  const BTN_SEL = "button.pzp-pc-setting-button";
   const VIDEO_SEL = "video.webplayer-internal-video";
   const QUALITY_SEL = "li.pzp-ui-setting-quality-item";
 
@@ -122,9 +120,25 @@
   const removePopup = (el) => {
     const container =
       el.closest(
-        '[role="dialog"], [class*="popup"], [class*="modal"], [class*="layer"]'
+        '[role="dialog"],[role="alertdialog"], [class*="popup"], [class*="modal"], [class*="layer"]'
       ) || el;
+
+    const nodes = container.parentElement.querySelectorAll(
+      'button, [role="button"], input[type="button"], input[type="submit"], a[role="button"]'
+    );
+
+    container.parentElement.style.opacity = "0";
+    document.documentElement.style.overflow = "auto";
     container.parentElement.remove();
+
+    // if (nodes.length != 0) {
+    //   let event = new MouseEvent("click", {
+    //     bubbles: true,
+    //     cancelable: true,
+    //     view: window,
+    //   });
+    //   nodes[0].dispatchEvent(event);
+    // }
   };
 
   const scan = (root) => {
