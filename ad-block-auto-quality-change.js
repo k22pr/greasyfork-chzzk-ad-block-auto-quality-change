@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         CHZZK  Ad Block Auto Quality Change
-// @version      1.0.6
+// @version      1.0.7
 // @match        https://chzzk.naver.com/*
 // @description  치지직 광고 차단 감지 스크립트를 우회합니다.
 // @run-at       document-start
@@ -11,8 +11,8 @@
 // ==/UserScript==
 
 (function () {
-  const VIDEO_SEL = "video.webplayer-internal-video";
-  const QUALITY_SEL = "li.pzp-ui-setting-quality-item";
+  const VIDEO_ELEMENT_NAME = "video.webplayer-internal-video";
+  const QUALITY_ELEMENT_NAME = "li.pzp-ui-setting-quality-item";
 
   let qualityInterval = null;
   let processed = false;
@@ -24,76 +24,38 @@
     el.dispatchEvent(
       new KeyboardEvent("keydown", {
         bubbles: true,
-        cancelable: true,
         key: "Enter",
         code: "Enter",
       })
     );
-    item.dispatchEvent(
-      new KeyboardEvent("keyup", {
-        bubbles: true,
-        cancelable: true,
-        key: "Enter",
-        code: "Enter",
-      })
+    el.dispatchEvent(
+      new KeyboardEvent("keyup", { bubbles: true, key: "Enter", code: "Enter" })
     );
   }
 
-  function tick() {
+  async function tick() {
+    await new Promise((r) =>
+      requestAnimationFrame(() => requestAnimationFrame(r))
+    );
     const hasLive = location.pathname.includes("/live/");
-    const videoEl = document.querySelector(VIDEO_SEL);
-    const qualityItems = document.querySelectorAll(QUALITY_SEL);
-    console.log(qualityItems);
-    let highItem = Array.from(qualityItems).find((option) =>
-      option.textContent.includes("1080p")
-    );
+    const videoEl = document.querySelector(VIDEO_ELEMENT_NAME);
+    const items = [
+      ...new Set([...document.querySelectorAll(QUALITY_ELEMENT_NAME)]),
+    ];
+    const target = items.find((li) => /1080p|720p/.test(li.innerText));
+    if (!target) return false;
 
-    console.log("highItem", highItem, highItem?.textContent);
-
-    if (!highItem)
-      highItem = Array.from(qualityItems).find((option) =>
-        option.textContent.includes("720p")
-      );
-
-    console.log("highItem", highItem);
     const isNowHighQuality =
-      highItem?.classList.contains("pzp-ui-setting-pane-item--checked") ??
-      false;
-
-    // console.log("hq:", !!isNowHighQuality, "paused:", videoEl?.paused ?? null);
-
-    console.log("highItem", highItem, "isNowHighQuality", isNowHighQuality);
-    console.log(
-      "1080p",
-      highItem?.textContent?.includes("1080p"),
-      "720p",
-      highItem?.textContent?.includes("720p"),
-      "checked",
-      highItem?.classList.contains("pzp-ui-setting-pane-item--checked")
-    );
-
-    if (!hasLive) {
-      console.log("stop interval (!hasLive)", !hasLive);
-      return stopQualityInterval();
-    }
+      target?.classList.contains("pzp-ui-setting-pane-item--checked") ?? false;
 
     if (hasLive && !isNowHighQuality && !processed) {
-      pressEnterOnElement(highItem);
+      pressEnterOnElement(target);
+      videoEl.play().catch(() => {});
       processed = true;
       return;
     }
 
-    if (isNowHighQuality && videoEl && videoEl.paused) {
-      videoEl.play().catch(() => {});
-    }
-
     if (isNowHighQuality && videoEl && !videoEl.paused) {
-      console.log(
-        "stop interval (isNowHighQuality && videoEl && !videoEl.paused)",
-        isNowHighQuality,
-        videoEl,
-        !videoEl.paused
-      );
       stopQualityInterval();
     }
   }
@@ -113,7 +75,22 @@
     processed = false;
     stopQualityInterval();
     startQualityInterval();
-    setTimeout(stopQualityInterval, 5000);
+    setTimeout(stopQualityInterval, 3000);
+  }
+
+  // test: Alt+H
+  window.addEventListener("keydown", (e) => {
+    if (e.altKey && e.key.toLowerCase() === "h") pressEnterOnElement();
+  });
+
+  function tryMount() {
+    const videoElement = document.querySelector(VIDEO_ELEMENT_NAME);
+
+    videoElement?.addEventListener("loadedmetadata", () => {
+      // videoElement.pause().catch(() => {});
+      tick();
+      restartQualityInterval();
+    });
   }
 
   // SPA URL change
@@ -134,12 +111,26 @@
     window.addEventListener("popstate", fireLoc);
   })();
 
-  // test: Alt+H
-  window.addEventListener("keydown", (e) => {
-    if (e.altKey && e.key.toLowerCase() === "h") pressEnterOnElement();
-  });
+  // 초기 시도
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", tryMount, { once: true });
+  } else {
+    tryMount();
+  }
 
-  restartQualityInterval();
+  // 동적 삽입 감시: 비디오나 컨테이너가 나중에 생길 때
+  new MutationObserver((list) => {
+    for (const m of list) {
+      for (const n of m.addedNodes) {
+        if (n.nodeType !== 1) continue;
+        if (
+          n.matches?.(VIDEO_ELEMENT_NAME) ||
+          n.querySelector?.(VIDEO_ELEMENT_NAME)
+        )
+          tryMount();
+      }
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true });
 })();
 
 (function () {
@@ -157,13 +148,13 @@
         '[role="dialog"], [role="alertdialog"], [class*="popup"], [class*="modal"], [class*="layer"]'
       ) || el;
 
-    const nodes = container.parentElement.querySelectorAll(
-      'button, [role="button"], input[type="button"], input[type="submit"], a[role="button"]'
-    );
-
     container.parentElement.style.opacity = "0";
     document.documentElement.style.overflow = "auto";
     container.parentElement.remove();
+
+    // const nodes = container.parentElement.querySelectorAll(
+    //   'button, [role="button"], input[type="button"], input[type="submit"], a[role="button"]'
+    // );
 
     // if (nodes.length != 0) {
     //   let event = new MouseEvent("click", {

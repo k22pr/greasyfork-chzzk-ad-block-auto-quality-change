@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         CHZZK Live Bar
-// @version      1.0.1
+// @version      1.0.4
 // @match        https://chzzk.naver.com/*
 // @description  치지직 라이브 방송 접속 시점부터의 재생바를 제공합니다.
 // @run-at       document-idle
@@ -11,14 +11,14 @@
 // ==/UserScript==
 
 (function () {
-  const VSEL = "video.webplayer-internal-video";
+  const VIDEO_ELEMENT_NAME = "video.webplayer-internal-video";
   const BOTTOM_SEL = "div.pzp-pc__bottom";
 
   const CSS = `
       .live-bar-box{display:flex !important;position:absolute;left:0px;bottom:30px !important;width:100%;font-size:11px;line-height:1;}
       // .live-bar-box{opacity:1 !important;}
-      .live-bar-box .live-bar-ui{width:100%;display:flex;gap:4px;align-items:center;color:#fff;padding:6px 8px;}
-      .live-bar-box .go{border:0;border-radius:6px;padding:2px 8px;background:#868e96;color:#fff;cursor:pointer;font-size:11px;line-height:1;}
+      .live-bar-box .live-bar-ui{width:100%;display:flex;gap:6px;align-items:center;color:#fff;padding:6px 8px;}
+      .live-bar-box .go{border:0;border-radius:6px;padding:2px 8px;background:#868e96;color:#fff;cursor:pointer;font-size:11px;line-height:1;margin-left:4px;}
       .live-bar-box .go.live{background:rgb(221, 51, 51);box-shadow:0px 0px 4px rgba(221, 51, 51, 0.5);}
       .live-bar-box .t{white-space:nowrap;min-width:20px;text-align:center}
       .live-bar-box .time{display:flex;gap:4px;align-items:center}
@@ -26,7 +26,7 @@
       .live-bar-box .slide-box:hover{height:6px;}
       .live-bar-box .slide-box div{transition:height 0.2s;}
       .live-bar-box .slide-box .track{position:absolute;left:0px;width:100%;height:3px;background:rgba(255,255,255,0.5);}
-      .live-bar-box .slide-box .rng{position:absolute;left:0px;height:3px;background:#00f889;transition:width 0.1s;}
+      .live-bar-box .slide-box .rng{position:absolute;left:0px;height:3px;background:#00f889;transition:width 0.1s;transition-delay: 0.1}
       .live-bar-box .slide-box:hover .track{height:6px;border-radius:3px;box-shadow:0px 0px 4px rgba(0,0,0,0.3);}
       .live-bar-box .slide-box:hover .rng{height:6px;border-radius:3px;box-shadow:0px 0px 5px #00f889;}
       .live-bar-box.no-anim .slide-box .rng { transition: none !important; }
@@ -61,6 +61,7 @@
     const h = (t / 3600) | 0,
       m = ((t % 3600) / 60) | 0,
       s = t % 60 | 0;
+
     return h
       ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
       : `${m}:${String(s).padStart(2, "0")}`;
@@ -154,7 +155,7 @@
       if (!isFinite(hi) || hi <= lo) return;
 
       const t = lo + ratio * (hi - lo);
-      const nearLive = ok && end - t < 1.5;
+      const nearLive = ok && end - t < 3;
 
       tip.textContent = nearLive ? "LIVE" : fmt(t - lo); // DVR 경과시간 표기
       // 위치
@@ -186,7 +187,7 @@
 
     const atLiveEdge = () => {
       const { end } = getEdges(v);
-      return isFinite(end) && end - v.currentTime < 3;
+      return isFinite(end) && end - v.currentTime < 5;
     };
 
     function setPinnedUI() {
@@ -196,7 +197,8 @@
     }
 
     function updateUI() {
-      const { start, end, ok } = getEdges(v);
+      let { start, end, ok } = getEdges(v);
+      end = Math.max(start, end);
 
       if (ok) {
         rng.setAttribute("min", String(start));
@@ -206,14 +208,21 @@
         rng.setAttribute("max", String(isFinite(v.duration) ? v.duration : 0));
       }
 
-      const percent = (v.currentTime - start) / (end - start);
-      rng.style.width = `${percent * 100}%`;
+      let secondCurrentTime = v.currentTime;
+      // start = Math.floor(start) + end - Math.floor(end) + 0.35;
 
-      if (!dragging) rng.setAttribute("value", String(v.currentTime));
+      const percent = (secondCurrentTime - start) / (end - start);
+      if (end - secondCurrentTime < 3) {
+        rng.style.width = "100%";
+      } else {
+        rng.style.width = `${Math.min(100, percent * 100)}%`;
+      }
 
-      const cur = Math.max(0, v.currentTime - start);
+      if (!dragging) rng.setAttribute("value", String(secondCurrentTime));
+
+      const cur = Math.max(0, secondCurrentTime - start);
       const total = Math.max(0, end - start);
-      tCurr.textContent = fmt(cur);
+      tCurr.textContent = fmt(Math.min(cur, total));
       tTotal.textContent = ok
         ? fmt(total)
         : isFinite(v.duration)
@@ -230,6 +239,7 @@
       const lo = start,
         hi = end;
 
+      // val = Math.floor(val) + (end - Math.floor(end));
       v.currentTime = Math.min(hi, Math.max(lo, val));
     }
 
@@ -259,7 +269,7 @@
     btn.addEventListener("click", () => {
       const { end, ok } = getEdges(v);
       if (!ok) return;
-      v.currentTime = end - 0.05;
+      v.currentTime = end - 0.3;
     });
 
     slide.addEventListener(
@@ -322,14 +332,31 @@
   }
 
   function tryMountAll() {
-    document.querySelectorAll(VSEL).forEach((v) => {
+    const hasLive = location.pathname.includes("/live/");
+    if (!hasLive) return;
+    document.querySelectorAll(VIDEO_ELEMENT_NAME).forEach((v) => {
       const bottom = findBottomContainer(v);
       if (bottom) mount(v);
     });
   }
 
-  const hasLive = location.pathname.includes("/live/");
-  if (!hasLive) return;
+  // SPA URL change
+  (function () {
+    const fireLoc = () => setTimeout(tryMountAll, 0);
+    const _ps = history.pushState,
+      _rs = history.replaceState;
+    history.pushState = function () {
+      const r = _ps.apply(this, arguments);
+      fireLoc();
+      return r;
+    };
+    history.replaceState = function () {
+      const r = _rs.apply(this, arguments);
+      fireLoc();
+      return r;
+    };
+    window.addEventListener("popstate", fireLoc);
+  })();
 
   // 초기 시도
   if (document.readyState === "loading") {
@@ -343,7 +370,11 @@
     for (const m of list) {
       for (const n of m.addedNodes) {
         if (n.nodeType !== 1) continue;
-        if (n.matches?.(VSEL) || n.querySelector?.(VSEL)) tryMountAll();
+        if (
+          n.matches?.(VIDEO_ELEMENT_NAME) ||
+          n.querySelector?.(VIDEO_ELEMENT_NAME)
+        )
+          tryMountAll();
         if (n.matches?.(BOTTOM_SEL) || n.querySelector?.(BOTTOM_SEL))
           tryMountAll();
       }
