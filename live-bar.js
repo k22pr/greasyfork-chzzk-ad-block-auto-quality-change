@@ -13,7 +13,7 @@
 (function () {
   const VIDEO_ELEMENT_NAME = "video.webplayer-internal-video";
   const BOTTOM_SEL = "div.pzp-pc__bottom";
-  const EDGE_EPS = 0.5;
+  const EDGE_EPS = 1.0;
   const LIVE_EPS = 3.5;
   const MAX_VIDEO_DURATION = 60 * 1.5;
 
