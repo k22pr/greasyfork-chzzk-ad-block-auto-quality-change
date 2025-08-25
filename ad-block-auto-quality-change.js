@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         CHZZK  Ad Block Auto Quality Change
-// @version      1.0.7
+// @version      1.0.8
 // @match        https://chzzk.naver.com/*
 // @description  치지직 광고 차단 감지 스크립트를 우회합니다.
 // @run-at       document-start
@@ -151,19 +151,6 @@
     container.parentElement.style.opacity = "0";
     document.documentElement.style.overflow = "auto";
     container.parentElement.remove();
-
-    // const nodes = container.parentElement.querySelectorAll(
-    //   'button, [role="button"], input[type="button"], input[type="submit"], a[role="button"]'
-    // );
-
-    // if (nodes.length != 0) {
-    //   let event = new MouseEvent("click", {
-    //     bubbles: true,
-    //     cancelable: true,
-    //     view: window,
-    //   });
-    //   nodes[0].dispatchEvent(event);
-    // }
   };
 
   const scan = (root) => {
@@ -207,4 +194,22 @@
     subtree: true,
     characterData: true,
   });
+
+  // SPA URL change
+  (function () {
+    const fireLoc = () => setTimeout(() => scan(document), 0);
+    const _ps = history.pushState,
+      _rs = history.replaceState;
+    history.pushState = function () {
+      const r = _ps.apply(this, arguments);
+      fireLoc();
+      return r;
+    };
+    history.replaceState = function () {
+      const r = _rs.apply(this, arguments);
+      fireLoc();
+      return r;
+    };
+    window.addEventListener("popstate", fireLoc);
+  })();
 })();

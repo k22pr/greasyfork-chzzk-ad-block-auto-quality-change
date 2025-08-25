@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         CHZZK Live Bar
-// @version      1.0.4
+// @version      1.0.5
 // @match        https://chzzk.naver.com/*
 // @description  치지직 라이브 방송 접속 시점부터의 재생바를 제공합니다.
 // @run-at       document-idle
@@ -16,8 +16,8 @@
 
   const CSS = `
       .live-bar-box{display:flex !important;position:absolute;left:0px;bottom:30px !important;width:100%;font-size:11px;line-height:1;}
-      // .live-bar-box{opacity:1 !important;}
-      .live-bar-box .live-bar-ui{width:100%;display:flex;gap:6px;align-items:center;color:#fff;padding:6px 8px;}
+      .live-bar-box{opacity:1 !important;}
+      .live-bar-box .live-bar-ui{width:100%;display:flex;gap:8px;align-items:center;color:#fff;padding:6px 8px;}
       .live-bar-box .go{border:0;border-radius:6px;padding:2px 8px;background:#868e96;color:#fff;cursor:pointer;font-size:11px;line-height:1;margin-left:4px;}
       .live-bar-box .go.live{background:rgb(221, 51, 51);box-shadow:0px 0px 4px rgba(221, 51, 51, 0.5);}
       .live-bar-box .t{white-space:nowrap;min-width:20px;text-align:center}
@@ -111,12 +111,13 @@
       <div class="live-bar-ui">
       <div class='slide-box'>
         <div class='track'></div>
-        <div class="rng" min="0" max="29401.383"></div>
+        <div class="rng"></div>
       </div>
         <div class='time'>
           <span class="t curr">0:00</span>/
           <span class="t total">0:00</span>
           <button class="go">LIVE</button>
+          <!-- <button class="slide-test">0</button> -->
         </div>
       </div>
     `;
@@ -127,6 +128,7 @@
     const tTotal = wrap.querySelector(".total");
     const btn = wrap.querySelector(".go");
     const slide = wrap.querySelector(".slide-box");
+    // const testBox = wrap.querySelector(".slide-test");
 
     const tip = document.createElement("div");
     tip.className = "hover-tip";
@@ -173,6 +175,10 @@
     };
 
     function seekFromClick(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
       wrap.classList.add("no-anim");
       const rect = slide.getBoundingClientRect();
       const x = Math.min(Math.max(e.clientX - rect.left, 0), rect.width);
@@ -197,30 +203,17 @@
     }
 
     function updateUI() {
-      let { start, end, ok } = getEdges(v);
-      end = Math.max(start, end);
+      const { start, end, ok } = getEdges(v);
 
-      if (ok) {
-        rng.setAttribute("min", String(start));
-        rng.setAttribute("max", String(end));
-      } else {
-        rng.setAttribute("min", "0");
-        rng.setAttribute("max", String(isFinite(v.duration) ? v.duration : 0));
-      }
-
-      let secondCurrentTime = v.currentTime;
-      // start = Math.floor(start) + end - Math.floor(end) + 0.35;
-
-      const percent = (secondCurrentTime - start) / (end - start);
-      if (end - secondCurrentTime < 3) {
+      const percent = (v.currentTime - start) / (end - start);
+      if (end - v.currentTime < 3) {
         rng.style.width = "100%";
       } else {
         rng.style.width = `${Math.min(100, percent * 100)}%`;
       }
 
-      if (!dragging) rng.setAttribute("value", String(secondCurrentTime));
-
-      const cur = Math.max(0, secondCurrentTime - start);
+      // testBox.textContent = (v.currentTime - start).toFixed(4);
+      const cur = Math.max(0, v.currentTime - start);
       const total = Math.max(0, end - start);
       tCurr.textContent = fmt(Math.min(cur, total));
       tTotal.textContent = ok
@@ -239,6 +232,7 @@
       const lo = start,
         hi = end;
 
+      // console.log(val, lo, hi, Math.min(hi, Math.max(lo, val)));
       // val = Math.floor(val) + (end - Math.floor(end));
       v.currentTime = Math.min(hi, Math.max(lo, val));
     }
@@ -257,19 +251,27 @@
     slide.addEventListener("mousedown", seekFromClick);
     // slide.addEventListener("click", seekFromClick);
     document.addEventListener("keydown", (e) => {
-      wrap.classList.add("no-anim");
-      if (e.key === "ArrowLeft") {
-        seekTo(parseFloat(rng.getAttribute("value")) - 5);
-      } else if (e.key === "ArrowRight") {
-        seekTo(parseFloat(rng.getAttribute("value")) + 5);
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        wrap.classList.add("no-anim");
+
+        if (e.key === "ArrowLeft") {
+          seekTo(parseFloat(v.currentTime) - 5);
+        } else if (e.key === "ArrowRight") {
+          seekTo(parseFloat(v.currentTime) + 5);
+        }
+
+        requestAnimationFrame(() => wrap.classList.remove("no-anim"));
       }
-      requestAnimationFrame(() => wrap.classList.remove("no-anim"));
     });
 
     btn.addEventListener("click", () => {
       const { end, ok } = getEdges(v);
       if (!ok) return;
-      v.currentTime = end - 0.3;
+      seekTo(end - 0.3);
     });
 
     slide.addEventListener(
